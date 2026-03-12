@@ -114,12 +114,16 @@ export function AnalysisProvider({ children }: { children: React.ReactNode }) {
     setUploadSuccess(false);
     const formData = new FormData();
     formData.append("file", file);
-    const res = await fetch("http://127.0.0.1:8001/ocr", {
+    const res = await fetch("/api/analyze", {
       method: "POST",
       body: formData,
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error || "Failed to extract text from file");
+    }
     const data = await res.json();
-    setLeaseText(data.text);
+    setLeaseText(data.text || "");
     setUploadSuccess(true);
   }, []);
 
@@ -233,6 +237,7 @@ Tenant`;
             ? data.highlightedClauses
             : extractRiskClauses(leaseText)
         );
+        setLegalRisks(Array.isArray(data.legalRisks) ? data.legalRisks : []);
 
         const text = leaseText.toLowerCase();
         let score = 0;
@@ -247,16 +252,6 @@ Tenant`;
         setRiskScore(score);
         setRiskWarning(warning);
 
-        const bertResponse = await fetch("http://127.0.0.1:8001/classify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: leaseText }),
-        });
-        const bertData = await bertResponse.json();
-        if (!bertResponse.ok) {
-          throw new Error(bertData?.error || "LegalBERT analysis failed");
-        }
-        setLegalRisks(bertData.results || []);
         setRecentAnalyses((prev) => [
           `Lease ${new Date().toLocaleTimeString()}`,
           ...prev.slice(0, 4),

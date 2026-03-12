@@ -1,11 +1,67 @@
 import OpenAI from "openai";
+import type { LegalRisk } from "@/app/lib/lease-utils";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+const LEGALBERT_API_BASE =
+  process.env.LEGALBERT_API_BASE_URL ||
+  process.env.LEGALBERT_API_URL ||
+  "";
+
+async function fetchLegalBertRisks(text: string): Promise<LegalRisk[]> {
+  if (!LEGALBERT_API_BASE) return [];
+
+  try {
+    const response = await fetch(`${LEGALBERT_API_BASE.replace(/\/$/, "")}/classify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    return Array.isArray(data?.results) ? data.results : [];
+  } catch {
+    return [];
+  }
+}
+
+async function fetchOcrText(file: File): Promise<string> {
+  if (!LEGALBERT_API_BASE) {
+    throw new Error("OCR backend is not configured.");
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${LEGALBERT_API_BASE.replace(/\/$/, "")}/ocr`, {
+    method: "POST",
+    body: formData,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error || "OCR request failed");
+  }
+  return typeof data?.text === "string" ? data.text : "";
+}
+
 export async function POST(req: Request) {
   try {
+    const contentType = req.headers.get("content-type") || "";
+
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await req.formData();
+      const file = formData.get("file");
+
+      if (!(file instanceof File)) {
+        return Response.json({ error: "No file provided" }, { status: 400 });
+      }
+
+      const text = await fetchOcrText(file);
+      return Response.json({ text });
+    }
+
     const { text } = await req.json();
 
     if (!text) {
@@ -64,6 +120,7 @@ ${text}`,
     const raw = completion.choices[0].message.content || "{}";
     const cleaned = raw.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(cleaned);
+    const legalRisks = await fetchLegalBertRisks(text);
 
     return Response.json({
       leaseVerdict: parsed.leaseVerdict ?? "",
@@ -72,6 +129,7 @@ ${text}`,
       aiRiskReasons: parsed.aiRiskReasons ?? [],
       recommendedActions: Array.isArray(parsed.recommendedActions) ? parsed.recommendedActions : [],
       highlightedClauses: parsed.highlightedClauses ?? [],
+      legalRisks,
       result: parsed.result ?? "",
     });
   } catch (error: any) {
