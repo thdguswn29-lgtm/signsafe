@@ -1,10 +1,11 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "./context/language-context";
 import { useAnalysis } from "./context/analysis-context";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
-import { SignSafeLogo } from "./components/SignSafeLogo";
+import SignSafeLogo from "./components/SignSafeLogo";
 import { MotionButton, MotionCard, MotionReveal } from "./components/motion";
 
 const ANALYSIS_STEP_KEYS = ["analysisStep1", "analysisStep2", "analysisStep3", "analysisStep4"] as const;

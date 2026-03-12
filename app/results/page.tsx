@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAnalysis } from "../context/analysis-context";
 import { useLanguage } from "../context/language-context";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
-import { SignSafeLogo } from "../components/SignSafeLogo";
+import SignSafeLogo from "../components/SignSafeLogo";
 import { AnalysisResultsView } from "../components/AnalysisResultsView";
 
 export default function ResultsPage() {
